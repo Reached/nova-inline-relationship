@@ -117,20 +117,51 @@
             },
 
             fill(formData, parentAttrib) {
-            	formData.append(`${parentAttrib}[${this.id}][modelId]`, this.modelId);
+                formData.append(`${parentAttrib}[${this.id}][modelId]`, this.modelId);
+                // @note: why does this have to be so complicatd?
+                //  -   saving the original somewhere
+                //  -   keep track of index per $refs
                 this.getValueFromChildren().forEach(
                     (value, key) => {
                         let keyParts = key.split('_');
-
                         if (keyParts.length === 1) {
-                            formData.append(`${parentAttrib}[${this.id}][values][${key}]`, value);
-                            return;
+                            formData.append(`${parentAttrib}[${this.id}][${key}]`, value);
+                        } else {
+                            let parentParts = parentAttrib.split('_');
+                            let attrib = keyParts.slice(parentParts.length + 1).join('_');
+                            // @note: workaround for ndc. if attribute does not have the given
+                            //          structure to split, field still has to be present somehow.
+                            if(attrib == '') {
+                                attrib = key;
+                            }
+                            const arrayIndex = attrib.match(/\[\d+\]/);
+                            if (arrayIndex) {
+                                attrib = attrib.replace(arrayIndex, `]${arrayIndex}`);
+                                formData.append(`${parentAttrib}[${this.id}][${attrib}`, value);
+                            } else {
+                                formData.append(`${parentAttrib}[${this.id}][${attrib}]`, value);
+                            }
                         }
-
                         let parentParts = parentAttrib.split('_');
                         let attrib = keyParts.slice(parentParts.length + 1).join('_');
-
-                        formData.append(`${parentAttrib}[${this.id}][values][${attrib}]`, value);
+                        // @note: workaround for ndc. if attribute does not have the given
+                        //          structure to split, field still has to be present somehow.
+                        if(attrib == '') {
+                            attrib = key;
+                        }
+                        // If the child field has array values, they will be in this format:
+                        // attribute_name[0]
+                        // We don't want the field name sent for processing to be like this:
+                        // ....[values][attribute_name[0]]
+                        // Instead, the name sent will look like this:
+                        // ....[values][attribute_name][0]
+                        const arrayIndex = attrib.match(/\[\d+\]/);
+                        if (arrayIndex) {
+                            attrib = attrib.replace(arrayIndex, `]${arrayIndex}`);
+                            formData.append(`${parentAttrib}[${this.id}][values][${attrib}`, value);
+                        } else {
+                            formData.append(`${parentAttrib}[${this.id}][values][${attrib}]${arrayIndex}`, value);
+                        }
                     }
                 );
             },
